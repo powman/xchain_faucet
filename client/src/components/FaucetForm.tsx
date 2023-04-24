@@ -4,7 +4,6 @@ import { ClipLoader } from 'react-spinners';
 import Select from 'react-select';
 
 import './styles/FaucetForm.css';
-import ReCaptcha from './ReCaptcha';
 import FooterBox from './FooterBox';
 import queryString from 'query-string';
 import { DropdownOption } from './types';
@@ -14,9 +13,6 @@ import { AxiosResponse } from 'axios';
 const FaucetForm = (props: any) => {
   const [chain, setChain] = useState<number | null>(null);
   const [token, setToken] = useState<number | null>(null);
-  const [widgetID, setwidgetID] = useState(new Map());
-  const [recaptcha, setRecaptcha] = useState<ReCaptcha | undefined>(undefined);
-  const [isV2, setIsV2] = useState<boolean>(false);
   const [chainConfigs, setChainConfigs] = useState<any>([]);
   const [inputAddress, setInputAddress] = useState<string>('');
   const [address, setAddress] = useState<string | null>(null);
@@ -35,14 +31,6 @@ const FaucetForm = (props: any) => {
 
   // Update chain configs
   useEffect(() => {
-    setRecaptcha(
-      new ReCaptcha(
-        props.config.SITE_KEY,
-        props.config.ACTION,
-        props.config.V2_SITE_KEY,
-        setwidgetID
-      )
-    );
     updateChainConfigs();
     connectAccount(updateAddress, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,13 +304,6 @@ const FaucetForm = (props: any) => {
     }
   }
 
-  async function getCaptchaToken(
-    index: number = 0
-  ): Promise<{ token?: string; v2Token?: string }> {
-    const { token, v2Token } = await recaptcha!.getToken(isV2, widgetID, index);
-    return { token, v2Token };
-  }
-
   function updateChain(option: any): void {
     let chainNum: number = option.value;
 
@@ -341,24 +322,6 @@ const FaucetForm = (props: any) => {
     }
   }
 
-  const ifCaptchaFailed = (
-    data: any,
-    index: number = 0,
-    reload: boolean = false
-  ) => {
-    if (typeof data?.message == 'string') {
-      if (data.message.includes('Captcha verification failed')) {
-        setIsV2(true);
-        recaptcha?.loadV2Captcha(
-          props.config.V2_SITE_KEY,
-          widgetID,
-          index,
-          reload
-        );
-      }
-    }
-  };
-
   async function sendToken(): Promise<void> {
     if (!shouldAllowSend) {
       return;
@@ -367,14 +330,11 @@ const FaucetForm = (props: any) => {
     try {
       setIsLoading(true);
 
-      const { token, v2Token } = await getCaptchaToken();
-
       let { chain, erc20 } = getChainParams();
 
       const response = await props.axios.post(props.config.api.sendToken, {
         address,
         token,
-        v2Token,
         chain,
         erc20,
       });
@@ -382,8 +342,6 @@ const FaucetForm = (props: any) => {
     } catch (err: any) {
       data = err?.response?.data || err;
     }
-
-    ifCaptchaFailed(data);
 
     setSendTokenResponse({
       txHash: data?.txHash,
@@ -486,13 +444,7 @@ const FaucetForm = (props: any) => {
     </div>
   );
 
-  const resetRecaptcha = (): void => {
-    setIsV2(false);
-    recaptcha!.resetV2Captcha(widgetID);
-  };
-
   const back = (): void => {
-    resetRecaptcha();
     setSendTokenResponse({
       txHash: null,
       message: null,
